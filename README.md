@@ -1,5 +1,3 @@
-# UTSModelDeployment-app
-
 # Hotel Booking Cancellation Prediction
 
 An end-to-end machine learning project that predicts whether a hotel booking will be cancelled, from raw data through to a deployed Streamlit web application.
