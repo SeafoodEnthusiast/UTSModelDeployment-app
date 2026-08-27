@@ -3,15 +3,14 @@ import numpy as np
 import warnings
 import joblib
 import sys
-
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import classification_report, accuracy_score
-
 from xgboost import XGBClassifier
 from sklearn.ensemble import RandomForestClassifier
 
 warnings.filterwarnings('ignore')
+
 
 class HotelBookingModel:
     def __init__(self, data_path):
@@ -33,8 +32,23 @@ class HotelBookingModel:
 
         for col in df.select_dtypes(include=['object']).columns:
             df[col] = df[col].fillna(df[col].mode()[0])
+
         for col in df.select_dtypes(exclude=['object']).columns:
             df[col] = df[col].fillna(df[col].median())
+
+        cols_with_outliers = [
+            'no_of_adults', 'no_of_children', 'no_of_weekend_nights', 'no_of_week_nights',
+            'required_car_parking_space', 'lead_time', 'no_of_previous_cancellations',
+            'no_of_previous_bookings_not_canceled', 'avg_price_per_room', 'no_of_special_requests'
+        ]
+
+        for col in cols_with_outliers:
+            q1 = df[col].quantile(0.25)
+            q3 = df[col].quantile(0.75)
+            iqr = q3 - q1
+            lower = q1 - 1.5 * iqr
+            upper = q3 + 1.5 * iqr
+            df[col] = df[col].clip(lower=lower, upper=upper)
 
         for col in df.select_dtypes(include=['object']).columns:
             le = LabelEncoder()
@@ -45,7 +59,7 @@ class HotelBookingModel:
         y = df['booking_status']
 
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X, y, test_size=0.3, random_state=42)
+            X, y, test_size=0.2, random_state=42)
 
     def train_model(self, model_type='random_forest'):
         if model_type == 'xgboost':
@@ -53,14 +67,15 @@ class HotelBookingModel:
                 use_label_encoder=False,
                 eval_metric='logloss',
                 random_state=42,
+                n_jobs=2,
                 max_depth=5,
-                n_estimators=50
+                subsample=0.8,
+                colsample_bytree=0.8
             )
         elif model_type == 'random_forest':
             self.model = RandomForestClassifier(
                 n_estimators=10,
-                random_state=42,
-                max_depth=8
+                random_state=42
             )
         else:
             raise ValueError("Unsupported model type. Use 'xgboost' or 'random_forest'.")
@@ -79,6 +94,7 @@ class HotelBookingModel:
         joblib.dump(self.model, filename)
         print(f"Model saved to {filename}")
 
+
 if __name__ == "__main__":
     model_choice = 'random_forest'
     if len(sys.argv) > 1:
@@ -90,5 +106,3 @@ if __name__ == "__main__":
     model.train_model(model_choice)
     model.evaluate_model()
     model.save_model("best_booking_model.pkl")
-
-
